@@ -98,6 +98,7 @@ class User {
   final String nombre;
   final String apellido;
   final String ciudad;
+  final String empresa;
 
   User({
     required this.codigo,
@@ -105,6 +106,8 @@ class User {
     required this.nombre,
     required this.apellido,
     required this.ciudad,
+    required this.empresa,
+
   });
 }
 
@@ -121,6 +124,7 @@ class UserRepository {
       nombre: "Alvaro",
       apellido: "Menacho",
       ciudad: "Lima",
+      empresa: "Buro",
     ),
     User(
       codigo: "12345678",
@@ -128,7 +132,40 @@ class UserRepository {
       nombre: "Vicente",
       apellido: "Galdos",
       ciudad: "Arequipa",
+      empresa: "Buro",
     ),
+    User(
+      codigo: "12121212",
+      password: "dhidalgo",
+      nombre: "Daniel",
+      apellido: "Hidalgo",
+      ciudad: "Lima",
+      empresa: "Buro",
+    ),
+    User(
+      codigo: "13131313",
+      password: "soporteic",
+      nombre: "Noelia",
+      apellido: "Soporte",
+      ciudad: "Lima",
+      empresa: "Buro",
+    ),
+    User(
+      codigo: "22222222",
+      password: "patolucas",
+      nombre: "Donald",
+      apellido: "Pato",
+      ciudad: "Los Angeles",
+      empresa: "Disney",
+    ),
+    User(
+      codigo: "47474747",
+      password: "ironman",
+      nombre: "Tony",
+      apellido: "Stark",
+      ciudad: "Malibu",
+      empresa: "Stark Industries",
+    )
   ];
 
   Future<User?> login(String codigo, String password) async {
@@ -577,6 +614,8 @@ class SuccessScreen extends StatelessWidget {
                         _buildInfoRow(Icons.person, "Usuario", "${user.nombre} ${user.apellido}"),
                         const Divider(height: 30),
                         _buildInfoRow(Icons.location_city, "Ciudad", user.ciudad),
+                        const Divider(height: 30),
+                        _buildInfoRow(Icons.location_city, "Empresa", user.empresa),
                         const Divider(height: 30),
                         _buildInfoRow(Icons.pin_drop, "GPS", "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}"),
                         const SizedBox(height: 20),
