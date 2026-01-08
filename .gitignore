@@ -1,0 +1,56 @@
+# --- FLUTTER & DART ---
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+# Si usas generación de código (Moor, Hive, etc), opcionalmente ignora los .g.dart si prefieres que se generen localmente
+# *.g.dart
+
+# --- ANDROID ---
+.gradle/
+local.properties
+**/android/**/generated/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+*.bundle
+*.apk
+*.aab
+
+# --- IOS & MACOS ---
+**/ios/.generated/
+**/ios/Pods/
+**/ios/Runner/GeneratedPluginRegistrant.h
+**/ios/Runner/GeneratedPluginRegistrant.m
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+*.modsig
+*.db
+*.pvr
+*.app
+*.ipa
+.tags*
+
+# --- IDEs (VS Code & IntelliJ) ---
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.history
+
+# --- SISTEMA & LOGS ---
+.DS_Store
+*.log
+*.pyc
+*.swp
+.atom/
+.buildlog/
+migrate_working_dir/
+
+# --- SEGURIDAD ---
+.env*
+google-services.json
+GoogleService-Info.plist
