@@ -3,77 +3,73 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/date_symbol_data_local.dart';
 
-Future<void> main() async{
-  WidgetsFlutterBinding.ensureInitialized(); 
-  // Inicializa el formato de fechas en español
-  await initializeDateFormatting('es_ES', null);
+void main() {
   runApp(const AttendanceApp());
 }
 
 // ==========================================
-// 🎨 DESIGN SYSTEM & THEME (UI/UX)
+// 🎨 DESIGN SYSTEM & THEME
 // ==========================================
 
 class AppColors {
-  static const Color primaryMint = Color(0xFF4CAF8E); // Verde Menta (60%)
-  static const Color accentYellow = Color(0xFFFFD166); // Amarillo Cálido (10%)
-  static const Color background = Color(0xFFF7F9FB); // Neutro Fondo
-  static const Color textPrimary = Color(0xFF1F2933); // Texto Principal
-  static const Color textSecondary = Color(0xFF6B7280); // Texto Secundario
+  static const Color primaryRed = Color(0xFFD82F20);    // Rojo Principal
+  static const Color buttonYellow = Color(0xFFD89A38);  // Amarillo Botones
+  static const Color neutralGrey = Color(0xFF797979);   // Gris Neutral (Fondo/Detalles)
   static const Color white = Colors.white;
+  static const Color lightGrey = Color(0xFFF0F0F0);     // Para contraste en tarjetas
 }
+
 class AppTheme {
-  static ThemeData get lightTheme {
+  static ThemeData get theme {
     return ThemeData(
       useMaterial3: true,
-      scaffoldBackgroundColor: AppColors.background,
-      primaryColor: AppColors.primaryMint,
+      scaffoldBackgroundColor: AppColors.neutralGrey,
+      primaryColor: AppColors.primaryRed,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primaryMint,
-        primary: AppColors.primaryMint,
-        secondary: AppColors.accentYellow,
+        seedColor: AppColors.primaryRed,
+        primary: AppColors.primaryRed,
+        secondary: AppColors.buttonYellow,
         surface: AppColors.white,
       ),
-      textTheme: GoogleFonts.poppinsTextTheme().apply(
-        bodyColor: AppColors.textPrimary,
-        displayColor: AppColors.textPrimary,
+      textTheme: GoogleFonts.robotoTextTheme().apply(
+        bodyColor: AppColors.white,
+        displayColor: AppColors.white,
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: AppColors.primaryRed,
+        foregroundColor: AppColors.white,
+        centerTitle: true,
+        elevation: 4,
+        titleTextStyle: GoogleFonts.roboto(
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryMint,
-          foregroundColor: AppColors.white,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          backgroundColor: AppColors.buttonYellow,
+          foregroundColor: Colors.white,
+          elevation: 4,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(8),
           ),
-          textStyle: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
+          textStyle: GoogleFonts.roboto(
+            fontWeight: FontWeight.bold,
             fontSize: 16,
           ),
         ),
       ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.white,
-        contentPadding: const EdgeInsets.all(20),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppColors.primaryMint, width: 1.5),
-        ),
-        hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.5)),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.primaryRed;
+          }
+          return AppColors.white;
+        }),
+        checkColor: WidgetStateProperty.all(Colors.white),
       ),
-      // Versión simplificada para evitar errores de análisis
       cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 2,
@@ -83,10 +79,19 @@ class AppTheme {
           borderRadius: BorderRadius.circular(20),
         ),
       ),
-    ); // <-- Asegúrate de que este punto y coma esté aquí
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.white,
+        contentPadding: const EdgeInsets.all(16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+        hintStyle: const TextStyle(color: AppColors.neutralGrey),
+      ),
+    );
   }
 }
-
 
 // ==========================================
 // 🧠 DOMAIN LAYER (Entities)
@@ -98,7 +103,6 @@ class User {
   final String nombre;
   final String apellido;
   final String ciudad;
-  final String empresa;
 
   User({
     required this.codigo,
@@ -106,9 +110,14 @@ class User {
     required this.nombre,
     required this.apellido,
     required this.ciudad,
-    required this.empresa,
-
   });
+}
+
+class Vendor {
+  final String id;
+  final String name;
+
+  Vendor({required this.id, required this.name});
 }
 
 // ==========================================
@@ -116,123 +125,94 @@ class User {
 // ==========================================
 
 class UserRepository {
-  // 1. Lógica de Usuario Hardcoded
   static final List<User> _users = [
-    User(
-      codigo: "72383827",
-      password: "amenacho",
-      nombre: "Alvaro",
-      apellido: "Menacho",
-      ciudad: "Lima",
-      empresa: "Buro",
-    ),
-    User(
-      codigo: "12345678",
-      password: "vgaldos",
-      nombre: "Vicente",
-      apellido: "Galdos",
-      ciudad: "Arequipa",
-      empresa: "Buro",
-    ),
-    User(
-      codigo: "12121212",
-      password: "dhidalgo",
-      nombre: "Daniel",
-      apellido: "Hidalgo",
-      ciudad: "Lima",
-      empresa: "Buro",
-    ),
-    User(
-      codigo: "13131313",
-      password: "soporteic",
-      nombre: "Noelia",
-      apellido: "Soporte",
-      ciudad: "Lima",
-      empresa: "Buro",
-    ),
-    User(
-      codigo: "22222222",
-      password: "patolucas",
-      nombre: "Donald",
-      apellido: "Pato",
-      ciudad: "Los Angeles",
-      empresa: "Disney",
-    ),
-    User(
-      codigo: "47474747",
-      password: "ironman",
-      nombre: "Tony",
-      apellido: "Stark",
-      ciudad: "Malibu",
-      empresa: "Stark Industries",
-    )
+    User(codigo: "amenachod", password: "72383827", nombre: "Alvaro", apellido: "Menacho", ciudad: "Lima"),
+    User(codigo: "vgaldos", password: "12345678", nombre: "Vicente", apellido: "Galdos", ciudad: "Arequipa"),
+    User(codigo: "dhidalgo", password: "12121212", nombre: "Daniel", apellido: "Hidalgo", ciudad: "Cieneguilla"),
   ];
 
+  static final Map<String, List<Vendor>> _userVendors = {
+    "amenachod": [
+      Vendor(id: "V001", name: "Ilia Topuira"),
+      Vendor(id: "V002", name: "Islam Makachev"),
+      Vendor(id: "V003", name: "Sarah Bullet"),
+      Vendor(id: "V004", name: "Diego Lopez"),
+      Vendor(id: "V005", name: "Jon Jones"), // Agregados para probar scroll
+      Vendor(id: "V006", name: "Alex Pereira"),
+      Vendor(id: "V007", name: "Max Holloway"),
+      Vendor(id: "V008", name: "Charles Oliveira"),
+      Vendor(id: "V009", name: "Dustin Poirier"),
+      Vendor(id: "V010", name: "Justin Gaethje"),
+    ],
+    "vgaldos": [
+      Vendor(id: "V011", name: "John Doe"),
+      Vendor(id: "V012", name: "Nina Drama"),
+      Vendor(id: "V013", name: "Sean Strickland"),
+    ],
+    "dhidalgo": [
+      Vendor(id: "V014", name: "Merab Dvalishvili"),
+      Vendor(id: "V015", name: "Tom Aspinall"),
+      Vendor(id: "V016", name: "Chito Vera"),
+    ],
+  };
+
   Future<User?> login(String codigo, String password) async {
-    // Simulamos un pequeño delay para UX
-    await Future.delayed(const Duration(milliseconds: 800));
+    await Future.delayed(const Duration(milliseconds: 500));
     try {
-      return _users.firstWhere(
-        (u) => u.codigo == codigo && u.password == password,
-      );
+      return _users.firstWhere((u) => u.codigo == codigo && u.password == password);
     } catch (e) {
       return null;
     }
   }
+
+  List<Vendor> getVendorsForUser(String userCode) {
+    return _userVendors[userCode] ?? [];
+  }
 }
 
 class AttendanceService {
-  static const String _lastAttendanceKey = 'last_attendance_timestamp';
-
-  // Geolocalización
   Future<Position> getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) throw Exception('Servicios de ubicación desactivados.');
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw Exception('Los servicios de ubicación están desactivados.');
-    }
-
-    permission = await Geolocator.checkPermission();
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        throw Exception('Permisos de ubicación denegados.');
-      }
+      if (permission == LocationPermission.denied) throw Exception('Permisos denegados.');
     }
-
     if (permission == LocationPermission.deniedForever) {
-      throw Exception(
-          'Permisos denegados permanentemente. Habilítalos en ajustes.');
+      throw Exception('Permisos denegados permanentemente.');
     }
-
     return await Geolocator.getCurrentPosition();
   }
 
-  // Restricción de Tiempo (4 horas)
-  Future<bool> canMarkAttendance(String userId) async {
+  Future<bool> isVendorLocked(String userCode, String vendorId) async {
     final prefs = await SharedPreferences.getInstance();
-    final String? lastTimeStr = prefs.getString('${_lastAttendanceKey}_$userId');
+    final key = 'attendance_${userCode}_$vendorId';
+    final String? lastTimeStr = prefs.getString(key);
 
-    if (lastTimeStr == null) return true;
+    if (lastTimeStr == null) return false;
 
     final DateTime lastTime = DateTime.parse(lastTimeStr);
     final DateTime now = DateTime.now();
     final Duration difference = now.difference(lastTime);
 
-    return difference.inHours >= 4;
+    return difference.inHours < 7;
   }
 
-  Future<void> saveAttendance(String userId) async {
+  Future<void> markVendors(String userCode, List<String> vendorIds) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        '${_lastAttendanceKey}_$userId', DateTime.now().toIso8601String());
+    final nowStr = DateTime.now().toIso8601String();
+
+    for (var vId in vendorIds) {
+      final key = 'attendance_${userCode}_$vId';
+      await prefs.setString(key, nowStr);
+    }
   }
 }
 
 // ==========================================
-// 📱 PRESENTATION LAYER (Screens & Widgets)
+// 📱 PRESENTATION LAYER (Screens)
 // ==========================================
 
 class AttendanceApp extends StatelessWidget {
@@ -241,9 +221,9 @@ class AttendanceApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Asistencia Diaria',
+      title: 'Gestión Vendedores',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      theme: AppTheme.theme,
       home: const LoginScreen(),
     );
   }
@@ -272,14 +252,13 @@ class _LoginScreenState extends State<LoginScreen> {
     if (user != null && mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => HomeScreen(user: user)),
+        MaterialPageRoute(builder: (_) => VendorListScreen(user: user)),
       );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Credenciales incorrectas"),
-          backgroundColor: Colors.red.shade300,
-          behavior: SnackBarBehavior.floating,
+        const SnackBar(
+          content: Text("Credenciales incorrectas"),
+          backgroundColor: AppColors.primaryRed,
         ),
       );
     }
@@ -294,66 +273,63 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo / Icono amigable
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryMint.withValues(alpha: 0.1),
+                decoration: const BoxDecoration(
+                  color: AppColors.white,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.wb_sunny_rounded,
-                  size: 60,
-                  color: AppColors.accentYellow,
+                child: Image.asset(
+                  'assets/images/logo.png', // Asegúrate que el nombre coincida
+                  width: 80,                // Ajusta el tamaño según necesites
+                  height: 80,
+                  fit: BoxFit.contain,
                 ),
               ),
               const SizedBox(height: 30),
               Text(
-                "¡Buen día!",
+                "Gestión de Asistencia",
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primaryMint,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                "Ingresa para registrar tu jornada",
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
+                      color: AppColors.white,
                     ),
               ),
               const SizedBox(height: 40),
-              TextField(
-                controller: _codeController,
-                decoration: const InputDecoration(
-                  hintText: "Código de usuario",
-                  prefixIcon: Icon(Icons.person_outline, color: AppColors.primaryMint),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  hintText: "Contraseña",
-                  prefixIcon: Icon(Icons.lock_outline, color: AppColors.primaryMint),
-                ),
-              ),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleLogin,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text("Iniciar Sesión"),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _codeController,
+                        style: const TextStyle(color: Colors.black),
+                        decoration: const InputDecoration(
+                          hintText: "Código de usuario",
+                          prefixIcon: Icon(Icons.person, color: AppColors.primaryRed),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _passController,
+                        obscureText: true,
+                        style: const TextStyle(color: Colors.black),
+                        decoration: const InputDecoration(
+                          hintText: "Contraseña",
+                          prefixIcon: Icon(Icons.lock, color: AppColors.primaryRed),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _handleLogin,
+                          child: _isLoading
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text("INGRESAR"),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -364,98 +340,108 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// --- Home Screen ---
-
-class HomeScreen extends StatefulWidget {
+// --- Vendor List Screen (Checklist) ---
+// ⚠️ AQUÍ ESTÁ LA CORRECCIÓN PRINCIPAL
+class VendorListScreen extends StatefulWidget {
   final User user;
-  const HomeScreen({super.key, required this.user});
+  const VendorListScreen({super.key, required this.user});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<VendorListScreen> createState() => _VendorListScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final _attendanceService = AttendanceService();
-  bool _isProcessing = false;
+class _VendorListScreenState extends State<VendorListScreen> {
+  final _repo = UserRepository();
+  final _service = AttendanceService();
+  
+  List<Vendor> _allVendors = [];
+  final Set<String> _lockedVendorIds = {};
+  final Set<String> _selectedVendorIds = {};
+  bool _isLoadingData = true;
+  bool _isSubmitting = false;
 
-  void _markAttendance() async {
-    setState(() => _isProcessing = true);
+  @override
+  void initState() {
+    super.initState();
+    _loadVendorsAndStatus();
+  }
+
+  Future<void> _loadVendorsAndStatus() async {
+    _allVendors = _repo.getVendorsForUser(widget.user.codigo);
+    
+    for (var vendor in _allVendors) {
+      final isLocked = await _service.isVendorLocked(widget.user.codigo, vendor.id);
+      if (isLocked) {
+        _lockedVendorIds.add(vendor.id);
+      }
+    }
+
+    setState(() => _isLoadingData = false);
+  }
+
+  void _toggleSelectAll(bool? value) {
+    setState(() {
+      if (value == true) {
+        for (var v in _allVendors) {
+          if (!_lockedVendorIds.contains(v.id)) {
+            _selectedVendorIds.add(v.id);
+          }
+        }
+      } else {
+        _selectedVendorIds.clear();
+      }
+    });
+  }
+
+  Future<void> _submitAttendance() async {
+    if (_selectedVendorIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Selecciona al menos un asesor disponible.")),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
 
     try {
-      // 1. Validar tiempo (4 horas)
-      final canMark = await _attendanceService.canMarkAttendance(widget.user.codigo);
+      final position = await _service.getCurrentLocation();
+      await _service.markVendors(widget.user.codigo, _selectedVendorIds.toList());
 
-      if (!canMark) {
-        if (mounted) {
-          _showErrorDialog(
-            "Descanso necesario",
-            "Deben pasar al menos 4 horas desde tu último registro.",
-          );
-        }
-        return;
-      }
-
-      // 2. Obtener GPS
-      final position = await _attendanceService.getCurrentLocation();
-
-      // 3. Guardar registro local
-      await _attendanceService.saveAttendance(widget.user.codigo);
-
-      // 4. Navegar a Éxito
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => SuccessScreen(
+            builder: (_) => SummaryScreen(
               user: widget.user,
               position: position,
+              vendorsCount: _selectedVendorIds.length,
             ),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        _showErrorDialog("Ups, algo pasó", e.toString().replaceAll("Exception: ", ""));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
       }
     } finally {
-      if (mounted) setState(() => _isProcessing = false);
+      if (mounted) setState(() => _isSubmitting = false);
     }
-  }
-
-  void _showErrorDialog(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Entendido", style: TextStyle(color: AppColors.primaryMint)),
-          )
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final availableVendors = _allVendors.where((v) => !_lockedVendorIds.contains(v.id)).toList();
+    final allSelected = availableVendors.isNotEmpty && 
+                        availableVendors.every((v) => _selectedVendorIds.contains(v.id));
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          "Mi Asistencia",
-          style: GoogleFonts.poppins(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: const Text("Seleccionar Asesores"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: AppColors.textSecondary),
+            icon: const Icon(Icons.logout),
             onPressed: () => Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -463,241 +449,246 @@ class _HomeScreenState extends State<HomeScreen> {
           )
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Hola, ${widget.user.nombre}",
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+      body: _isLoadingData
+          ? const Center(child: CircularProgressIndicator(color: AppColors.buttonYellow))
+          : Column(
+              children: [
+                // 1. HEADER (Fijo)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  color: Colors.black12,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Hola, ${widget.user.nombre}",
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        "Registra a los asesores que esten presentes ahora.",
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ],
                   ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "¿Listo para comenzar?",
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textSecondary,
+                ),
+
+                // 2. CHECKBOX MAESTRO (Fijo)
+                if (availableVendors.isNotEmpty)
+                  Container(
+                    color: AppColors.white,
+                    child: CheckboxListTile(
+                      title: const Text(
+                        "Registrar a todos tus asesores",
+                        style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryRed),
+                      ),
+                      value: allSelected,
+                      onChanged: _toggleSelectAll,
+                      activeColor: AppColors.primaryRed,
+                    ),
                   ),
-            ),
-            const Spacer(),
-            Center(
-              child: _isProcessing
-                  ? const CircularProgressIndicator(color: AppColors.primaryMint)
-                  : GestureDetector(
-                      onTap: _markAttendance,
-                      child: Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryMint,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primaryMint.withValues(alpha: 0.3),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
+
+                // 3. LISTA CON SCROLL (Ocupa todo el espacio flexible)
+                // Usamos Expanded para que tome todo el espacio restante
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(top: 8, bottom: 20, left: 8, right: 8),
+                    itemCount: _allVendors.length,
+                    itemBuilder: (context, index) {
+                      final vendor = _allVendors[index];
+                      final isLocked = _lockedVendorIds.contains(vendor.id);
+                      final isSelected = _selectedVendorIds.contains(vendor.id);
+
+                      return Card(
+                        color: isLocked ? Colors.grey.shade300 : AppColors.white,
+                        child: CheckboxListTile(
+                          title: Text(
+                            vendor.name,
+                            style: TextStyle(
+                              color: isLocked ? Colors.grey : Colors.black87,
+                              decoration: isLocked ? TextDecoration.lineThrough : null,
                             ),
-                          ],
+                          ),
+                          subtitle: isLocked 
+                            ? const Text("Ya fue registrada su asistencia", style: TextStyle(color: AppColors.primaryRed, fontSize: 12)) 
+                            : null,
+                          value: isLocked ? true : isSelected,
+                          onChanged: isLocked
+                              ? null 
+                              : (bool? value) {
+                                  setState(() {
+                                    if (value == true) {
+                                      _selectedVendorIds.add(vendor.id);
+                                    } else {
+                                      _selectedVendorIds.remove(vendor.id);
+                                    }
+                                  });
+                                },
+                          activeColor: isLocked ? Colors.grey : AppColors.primaryRed,
+                          checkColor: Colors.white,
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.touch_app_rounded,
-                              size: 50,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              "MARCAR\nASISTENCIA",
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                          ],
+                      );
+                    },
+                  ),
+                ),
+
+                // 4. ZONA SEGURA DEL BOTÓN (Sticky Footer)
+                // Container decorado para dar sombra y separación
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.neutralGrey,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        offset: const Offset(0, -2),
+                        blurRadius: 4,
+                      )
+                    ],
+                  ),
+                  // SafeArea asegura que el botón no sea tapado por la barra de navegación del sistema
+                  child: SafeArea(
+                    top: false, // Solo necesitamos protección abajo
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSubmitting || availableVendors.isEmpty ? null : _submitAttendance,
+                          icon: const Icon(Icons.check_circle_outline),
+                          label: _isSubmitting
+                              ? const Text("PROCESANDO...")
+                              : const Text("REGISTRAR ASISTENCIA"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.buttonYellow,
+                            disabledBackgroundColor: Colors.grey,
+                          ),
                         ),
                       ),
                     ),
+                  ),
+                ),
+              ],
             ),
-            const Spacer(),
-            Center(
-              child: Text(
-                "Tu ubicación será registrada",
-                style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.7)),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
     );
   }
 }
 
-// --- Success Screen ---
+// --- Summary Screen ---
 
-class SuccessScreen extends StatelessWidget {
+class SummaryScreen extends StatelessWidget {
   final User user;
   final Position position;
+  final int vendorsCount;
 
-  const SuccessScreen({
+  const SummaryScreen({
     super.key,
     required this.user,
     required this.position,
+    required this.vendorsCount,
   });
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final dateStr = DateFormat('EEEE, d MMMM', 'es_ES').format(now); // Requiere inicializar locale si se quiere español puro, por defecto inglés
-    final timeStr = DateFormat('h:mm a').format(now);
+    final dateStr = DateFormat('dd/MM/yyyy').format(now);
+    final timeStr = DateFormat('HH:mm').format(now);
 
     return Scaffold(
-      backgroundColor: AppColors.primaryMint,
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Icono de Éxito (Amarillo Accent)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    size: 40,
-                    color: AppColors.accentYellow,
+      backgroundColor: AppColors.neutralGrey,
+      appBar: AppBar(title: const Text("Resumen del Registro")),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.verified,
+                size: 80,
+                color: AppColors.buttonYellow,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                "¡Registro Exitoso!",
+                style: GoogleFonts.roboto(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.white,
+                ),
+              ),
+              const SizedBox(height: 30),
+              
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildRow(Icons.calendar_today, "Fecha", dateStr),
+                      const Divider(),
+                      _buildRow(Icons.access_time, "Hora", timeStr),
+                      const Divider(),
+                      _buildRow(Icons.people_alt, "Asesores", "$vendorsCount registrados"),
+                      const Divider(),
+                      _buildRow(Icons.person, "Usuario", "${user.nombre} ${user.apellido}"),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  "¡Registro Exitoso!",
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Que tengas una excelente jornada",
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Colors.white.withValues(alpha: 0.9),
-                  ),
-                ),
-                const SizedBox(height: 40),
-                
-                // Tarjeta de Detalles
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildInfoRow(Icons.calendar_today, "Fecha", dateStr),
-                        const Divider(height: 30),
-                        _buildInfoRow(Icons.access_time, "Hora", timeStr),
-                        const Divider(height: 30),
-                        _buildInfoRow(Icons.person, "Usuario", "${user.nombre} ${user.apellido}"),
-                        const Divider(height: 30),
-                        _buildInfoRow(Icons.location_city, "Ciudad", user.ciudad),
-                        const Divider(height: 30),
-                        _buildInfoRow(Icons.location_city, "Empresa", user.empresa),
-                        const Divider(height: 30),
-                        _buildInfoRow(Icons.pin_drop, "GPS", "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}"),
-                        const SizedBox(height: 20),
-                        // Datos sensibles (solo porque se pidieron en el prompt)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.background,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            children: [
-                              _buildMiniRow("Código", user.codigo),
-                              const SizedBox(height: 4),
-                              _buildMiniRow("Pass", "••••••"), // Oculto por seguridad visual, aunque el prompt lo pide, es mejor UX mostrar puntos o el dato pequeño
-                            ],
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 30),
-                TextButton.icon(
+              ),
+              
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
                   onPressed: () {
-                    // Volver al login para el siguiente usuario
                     Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
                       (route) => false,
                     );
                   },
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  label: const Text(
-                    "Volver al inicio",
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                )
-              ],
-            ),
+                  child: const Text("VOLVER AL INICIO"),
+                ),
+              )
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.primaryMint, size: 20),
-        const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
+  Widget _buildRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primaryRed, size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.neutralGrey,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        )
-      ],
-    );
-  }
-
-  Widget _buildMiniRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-        Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-      ],
+          )
+        ],
+      ),
     );
   }
 }
