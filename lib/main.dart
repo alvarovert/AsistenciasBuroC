@@ -1,11 +1,20 @@
+import 'dart:convert'; // Necesario para JSON
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http; // Necesario para conectar al Backend
 
 void main() {
   runApp(const AttendanceApp());
+}
+
+// ==========================================
+// ⚙️ CONFIGURACIÓN DE CONEXIÓN
+// ==========================================
+class ApiConfig {
+  // Tu URL de Ngrok
+  static const String baseUrl = 'https://necole-nonburnable-daniel.ngrok-free.dev/api';
 }
 
 // ==========================================
@@ -13,11 +22,11 @@ void main() {
 // ==========================================
 
 class AppColors {
-  static const Color primaryRed = Color(0xFFD82F20);    // Rojo Principal
-  static const Color buttonYellow = Color(0xFFD89A38);  // Amarillo Botones
-  static const Color neutralGrey = Color(0xFF797979);   // Gris Neutral (Fondo/Detalles)
+  static const Color primaryRed = Color(0xFFD82F20);
+  static const Color buttonYellow = Color(0xFFD89A38);
+  static const Color neutralGrey = Color(0xFF797979);
   static const Color white = Colors.white;
-  static const Color lightGrey = Color(0xFFF0F0F0);     // Para contraste en tarjetas
+  static const Color lightGrey = Color(0xFFF0F0F0);
 }
 
 class AppTheme {
@@ -99,25 +108,47 @@ class AppTheme {
 
 class User {
   final String codigo;
-  final String password;
   final String nombre;
   final String apellido;
   final String ciudad;
 
   User({
     required this.codigo,
-    required this.password,
     required this.nombre,
     required this.apellido,
     required this.ciudad,
   });
+
+  factory User.fromJson(Map<String, dynamic> json) {
+    return User(
+      codigo: json['codigo'] ?? '',
+      nombre: json['nombre'] ?? '',
+      apellido: json['apellido'] ?? '',
+      ciudad: json['ciudad'] ?? '',
+    );
+  }
 }
 
 class Vendor {
   final String id;
   final String name;
+  final DateTime? lastVisit;
 
-  Vendor({required this.id, required this.name});
+  Vendor({
+    required this.id, 
+    required this.name,
+    this.lastVisit,
+  });
+
+  factory Vendor.fromJson(Map<String, dynamic> json) {
+    return Vendor(
+      id: json['id_vendedor'].toString(),
+      name: json['nombre_tienda'] ?? 'Sin Nombre',
+      lastVisit: json['ultima_visita'] != null 
+          ? DateTime.parse(json['ultima_visita']) 
+          : null,
+    );
+  }
 }
 
 // ==========================================
@@ -125,48 +156,53 @@ class Vendor {
 // ==========================================
 
 class UserRepository {
-  static final List<User> _users = [
-    User(codigo: "amenachod", password: "72383827", nombre: "Alvaro", apellido: "Menacho", ciudad: "Lima"),
-    User(codigo: "vgaldos", password: "12345678", nombre: "Vicente", apellido: "Galdos", ciudad: "Arequipa"),
-    User(codigo: "dhidalgo", password: "12121212", nombre: "Daniel", apellido: "Hidalgo", ciudad: "Cieneguilla"),
-  ];
-
-  static final Map<String, List<Vendor>> _userVendors = {
-    "amenachod": [
-      Vendor(id: "V001", name: "Ilia Topuira"),
-      Vendor(id: "V002", name: "Islam Makachev"),
-      Vendor(id: "V003", name: "Sarah Bullet"),
-      Vendor(id: "V004", name: "Diego Lopez"),
-      Vendor(id: "V005", name: "Jon Jones"), // Agregados para probar scroll
-      Vendor(id: "V006", name: "Alex Pereira"),
-      Vendor(id: "V007", name: "Max Holloway"),
-      Vendor(id: "V008", name: "Charles Oliveira"),
-      Vendor(id: "V009", name: "Dustin Poirier"),
-      Vendor(id: "V010", name: "Justin Gaethje"),
-    ],
-    "vgaldos": [
-      Vendor(id: "V011", name: "John Doe"),
-      Vendor(id: "V012", name: "Nina Drama"),
-      Vendor(id: "V013", name: "Sean Strickland"),
-    ],
-    "dhidalgo": [
-      Vendor(id: "V014", name: "Merab Dvalishvili"),
-      Vendor(id: "V015", name: "Tom Aspinall"),
-      Vendor(id: "V016", name: "Chito Vera"),
-    ],
+  // ⚠️ IMPORTANTE: Estas cabeceras evitan que Ngrok bloquee la app
+  final Map<String, String> _headers = {
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true", 
   };
 
   Future<User?> login(String codigo, String password) async {
-    await Future.delayed(const Duration(milliseconds: 500));
     try {
-      return _users.firstWhere((u) => u.codigo == codigo && u.password == password);
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/login'),
+        headers: _headers, // Usamos las cabeceras aquí
+        body: jsonEncode({
+          "codigo": codigo,
+          "password": password,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return User.fromJson(data);
+      } else {
+        print("Login fallido: ${response.body}");
+        return null;
+      }
     } catch (e) {
-      return null;
+      print("Error de conexión: $e");
+      throw Exception("Error de conexión con el servidor");
     }
   }
 
-  List<Vendor> getVendorsForUser(String userCode) {
-    return _userVendors[userCode] ?? [];
+  Future<List<Vendor>> getVendorsForUser(String userCode) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/vendors?userCode=$userCode'),
+        headers: _headers, // Usamos las cabeceras aquí
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => Vendor.fromJson(json)).toList();
+      } else {
+        throw Exception('Error al cargar vendedores: ${response.statusCode}');
+      }
+    } catch (e) {
+      print("Error fetching vendors: $e");
+      return [];
+    }
   }
 }
 
@@ -186,27 +222,36 @@ class AttendanceService {
     return await Geolocator.getCurrentPosition();
   }
 
-  Future<bool> isVendorLocked(String userCode, String vendorId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'attendance_${userCode}_$vendorId';
-    final String? lastTimeStr = prefs.getString(key);
+  bool isVendorLocked(Vendor vendor) {
+    if (vendor.lastVisit == null) return false;
 
-    if (lastTimeStr == null) return false;
-
-    final DateTime lastTime = DateTime.parse(lastTimeStr);
-    final DateTime now = DateTime.now();
-    final Duration difference = now.difference(lastTime);
-
+    final now = DateTime.now();
+    final difference = now.difference(vendor.lastVisit!);
+    
     return difference.inHours < 7;
   }
 
-  Future<void> markVendors(String userCode, List<String> vendorIds) async {
-    final prefs = await SharedPreferences.getInstance();
-    final nowStr = DateTime.now().toIso8601String();
+  Future<void> markVendors(String userCode, List<String> vendorIds, Position position) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/attendance'),
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true", // Cabecera obligatoria
+        },
+        body: jsonEncode({
+          "userCode": userCode,
+          "vendorIds": vendorIds,
+          "lat": position.latitude,
+          "lng": position.longitude
+        }),
+      );
 
-    for (var vId in vendorIds) {
-      final key = 'attendance_${userCode}_$vId';
-      await prefs.setString(key, nowStr);
+      if (response.statusCode != 200) {
+        throw Exception("Error al guardar en base de datos: ${response.body}");
+      }
+    } catch (e) {
+      throw Exception("Error de red: $e");
     }
   }
 }
@@ -244,23 +289,40 @@ class _LoginScreenState extends State<LoginScreen> {
   final _repo = UserRepository();
   bool _isLoading = false;
 
-  void _handleLogin() async {
+void _handleLogin() async {
     setState(() => _isLoading = true);
-    final user = await _repo.login(_codeController.text, _passController.text);
-    setState(() => _isLoading = false);
-
-    if (user != null && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => VendorListScreen(user: user)),
-      );
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Credenciales incorrectas"),
-          backgroundColor: AppColors.primaryRed,
-        ),
-      );
+    
+    try {
+      print("Intentando conectar a: ${ApiConfig.baseUrl}/login"); // Log para consola
+      final user = await _repo.login(_codeController.text, _passController.text);
+      
+      if (user != null && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => VendorListScreen(user: user)),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Credenciales incorrectas o usuario no encontrado"),
+            backgroundColor: AppColors.primaryRed,
+          ),
+        );
+      }
+    } catch (e) {
+      // AQUÍ ESTÁ LA CLAVE: Mostramos el error real en la pantalla
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("ERROR TÉCNICO: $e"), // <--- Esto nos dirá qué pasa
+            backgroundColor: Colors.purple, // Color diferente para distinguir
+            duration: const Duration(seconds: 10), // Que dure bastante para leerlo
+          ),
+        );
+        print("ERROR COMPLETO EN CONSOLA: $e");
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -279,12 +341,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: AppColors.white,
                   shape: BoxShape.circle,
                 ),
-                child: Image.asset(
-                  'assets/images/logo.png', // Asegúrate que el nombre coincida
-                  width: 80,                // Ajusta el tamaño según necesites
-                  height: 80,
-                  fit: BoxFit.contain,
-                ),
+                child: const Icon(Icons.business, size: 60, color: AppColors.primaryRed),
               ),
               const SizedBox(height: 30),
               Text(
@@ -341,7 +398,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // --- Vendor List Screen (Checklist) ---
-// ⚠️ AQUÍ ESTÁ LA CORRECCIÓN PRINCIPAL
+
 class VendorListScreen extends StatefulWidget {
   final User user;
   const VendorListScreen({super.key, required this.user});
@@ -355,7 +412,6 @@ class _VendorListScreenState extends State<VendorListScreen> {
   final _service = AttendanceService();
   
   List<Vendor> _allVendors = [];
-  final Set<String> _lockedVendorIds = {};
   final Set<String> _selectedVendorIds = {};
   bool _isLoadingData = true;
   bool _isSubmitting = false;
@@ -367,23 +423,27 @@ class _VendorListScreenState extends State<VendorListScreen> {
   }
 
   Future<void> _loadVendorsAndStatus() async {
-    _allVendors = _repo.getVendorsForUser(widget.user.codigo);
-    
-    for (var vendor in _allVendors) {
-      final isLocked = await _service.isVendorLocked(widget.user.codigo, vendor.id);
-      if (isLocked) {
-        _lockedVendorIds.add(vendor.id);
+    try {
+      final vendors = await _repo.getVendorsForUser(widget.user.codigo);
+      setState(() {
+        _allVendors = vendors;
+        _isLoadingData = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingData = false);
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Error cargando asesores. Revisa tu conexión.")),
+        );
       }
     }
-
-    setState(() => _isLoadingData = false);
   }
 
   void _toggleSelectAll(bool? value) {
     setState(() {
       if (value == true) {
         for (var v in _allVendors) {
-          if (!_lockedVendorIds.contains(v.id)) {
+          if (!_service.isVendorLocked(v)) {
             _selectedVendorIds.add(v.id);
           }
         }
@@ -405,7 +465,7 @@ class _VendorListScreenState extends State<VendorListScreen> {
 
     try {
       final position = await _service.getCurrentLocation();
-      await _service.markVendors(widget.user.codigo, _selectedVendorIds.toList());
+      await _service.markVendors(widget.user.codigo, _selectedVendorIds.toList(), position);
 
       if (mounted) {
         Navigator.pushReplacement(
@@ -432,7 +492,7 @@ class _VendorListScreenState extends State<VendorListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final availableVendors = _allVendors.where((v) => !_lockedVendorIds.contains(v.id)).toList();
+    final availableVendors = _allVendors.where((v) => !_service.isVendorLocked(v)).toList();
     final allSelected = availableVendors.isNotEmpty && 
                         availableVendors.every((v) => _selectedVendorIds.contains(v.id));
 
@@ -453,7 +513,7 @@ class _VendorListScreenState extends State<VendorListScreen> {
           ? const Center(child: CircularProgressIndicator(color: AppColors.buttonYellow))
           : Column(
               children: [
-                // 1. HEADER (Fijo)
+                // 1. HEADER
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -474,7 +534,7 @@ class _VendorListScreenState extends State<VendorListScreen> {
                   ),
                 ),
 
-                // 2. CHECKBOX MAESTRO (Fijo)
+                // 2. CHECKBOX MAESTRO
                 if (availableVendors.isNotEmpty)
                   Container(
                     color: AppColors.white,
@@ -489,15 +549,14 @@ class _VendorListScreenState extends State<VendorListScreen> {
                     ),
                   ),
 
-                // 3. LISTA CON SCROLL (Ocupa todo el espacio flexible)
-                // Usamos Expanded para que tome todo el espacio restante
+                // 3. LISTA
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.only(top: 8, bottom: 20, left: 8, right: 8),
                     itemCount: _allVendors.length,
                     itemBuilder: (context, index) {
                       final vendor = _allVendors[index];
-                      final isLocked = _lockedVendorIds.contains(vendor.id);
+                      final isLocked = _service.isVendorLocked(vendor);
                       final isSelected = _selectedVendorIds.contains(vendor.id);
 
                       return Card(
@@ -533,8 +592,7 @@ class _VendorListScreenState extends State<VendorListScreen> {
                   ),
                 ),
 
-                // 4. ZONA SEGURA DEL BOTÓN (Sticky Footer)
-                // Container decorado para dar sombra y separación
+                // 4. BOTÓN
                 Container(
                   decoration: BoxDecoration(
                     color: AppColors.neutralGrey,
@@ -546,9 +604,8 @@ class _VendorListScreenState extends State<VendorListScreen> {
                       )
                     ],
                   ),
-                  // SafeArea asegura que el botón no sea tapado por la barra de navegación del sistema
                   child: SafeArea(
-                    top: false, // Solo necesitamos protección abajo
+                    top: false,
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: SizedBox(
